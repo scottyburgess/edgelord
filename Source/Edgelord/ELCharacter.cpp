@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "EdgelordCharacter.h"
+#include "ELCharacter.h"
 #include "Engine/LocalPlayer.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -12,7 +12,7 @@
 #include "InputActionValue.h"
 #include "Edgelord.h"
 
-AEdgelordCharacter::AEdgelordCharacter()
+AELCharacter::AELCharacter()
 {
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
@@ -50,7 +50,7 @@ AEdgelordCharacter::AEdgelordCharacter()
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 }
 
-void AEdgelordCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+void AELCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	// Set up action bindings
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
@@ -60,11 +60,11 @@ void AEdgelordCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 
 		// Moving
-		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AEdgelordCharacter::Move);
-		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AEdgelordCharacter::Look);
+		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AELCharacter::Move);
+		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AELCharacter::Look);
 
 		// Looking
-		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AEdgelordCharacter::Look);
+		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AELCharacter::Look);
 	}
 	else
 	{
@@ -72,7 +72,7 @@ void AEdgelordCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 	}
 }
 
-void AEdgelordCharacter::Move(const FInputActionValue& Value)
+void AELCharacter::Move(const FInputActionValue& Value)
 {
 	// input is a Vector2D
 	FVector2D MovementVector = Value.Get<FVector2D>();
@@ -81,7 +81,7 @@ void AEdgelordCharacter::Move(const FInputActionValue& Value)
 	DoMove(MovementVector.X, MovementVector.Y);
 }
 
-void AEdgelordCharacter::Look(const FInputActionValue& Value)
+void AELCharacter::Look(const FInputActionValue& Value)
 {
 	// input is a Vector2D
 	FVector2D LookAxisVector = Value.Get<FVector2D>();
@@ -90,7 +90,7 @@ void AEdgelordCharacter::Look(const FInputActionValue& Value)
 	DoLook(LookAxisVector.X, LookAxisVector.Y);
 }
 
-void AEdgelordCharacter::DoMove(float Right, float Forward)
+void AELCharacter::DoMove(float Right, float Forward)
 {
 	if (GetController() != nullptr)
 	{
@@ -110,7 +110,7 @@ void AEdgelordCharacter::DoMove(float Right, float Forward)
 	}
 }
 
-void AEdgelordCharacter::DoLook(float Yaw, float Pitch)
+void AELCharacter::DoLook(float Yaw, float Pitch)
 {
 	if (GetController() != nullptr)
 	{
@@ -120,13 +120,13 @@ void AEdgelordCharacter::DoLook(float Yaw, float Pitch)
 	}
 }
 
-void AEdgelordCharacter::DoJumpStart()
+void AELCharacter::DoJumpStart()
 {
 	// signal the character to jump
 	Jump();
 }
 
-void AEdgelordCharacter::DoJumpEnd()
+void AELCharacter::DoJumpEnd()
 {
 	// signal the character to stop jumping
 	StopJumping();

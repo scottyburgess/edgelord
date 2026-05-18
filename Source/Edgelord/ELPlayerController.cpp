@@ -1,7 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 
-#include "EdgelordPlayerController.h"
+#include "ELPlayerController.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
 #include "InputMappingContext.h"
@@ -9,7 +9,7 @@
 #include "Edgelord.h"
 #include "Widgets/Input/SVirtualJoystick.h"
 
-void AEdgelordPlayerController::BeginPlay()
+void AELPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
@@ -33,7 +33,7 @@ void AEdgelordPlayerController::BeginPlay()
 	}
 }
 
-void AEdgelordPlayerController::SetupInputComponent()
+void AELPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 
@@ -60,7 +60,7 @@ void AEdgelordPlayerController::SetupInputComponent()
 	}
 }
 
-bool AEdgelordPlayerController::ShouldUseTouchControls() const
+bool AELPlayerController::ShouldUseTouchControls() const
 {
 	// are we on a mobile platform? Should we force touch?
 	return SVirtualJoystick::ShouldDisplayTouchInterface() || bForceTouchControls;

@@ -4,20 +4,20 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
-#include "EdgelordGameMode.generated.h"
+#include "ELGameMode.generated.h"
 
 /**
  *  Simple GameMode for a third person game
  */
 UCLASS(abstract)
-class AEdgelordGameMode : public AGameModeBase
+class EDGELORD_API AELGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
 
 public:
 	
 	/** Constructor */
-	AEdgelordGameMode();
+	AELGameMode();
 };
 
 

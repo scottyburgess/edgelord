@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
-#include "EdgelordPlayerController.generated.h"
+#include "ELPlayerController.generated.h"
 
 class UInputMappingContext;
 class UUserWidget;
@@ -14,7 +14,7 @@ class UUserWidget;
  *  Manages input mappings
  */
 UCLASS(abstract)
-class AEdgelordPlayerController : public APlayerController
+class AELPlayerController : public APlayerController
 {
 	GENERATED_BODY()
 	

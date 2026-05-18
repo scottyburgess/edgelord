@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
-#include "EdgelordCharacter.generated.h"
+#include "ELCharacter.generated.h"
 
 class USpringArmComponent;
 class UCameraComponent;
@@ -18,8 +18,9 @@ DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
  *  A simple player-controllable third person character
  *  Implements a controllable orbiting camera
  */
-UCLASS(abstract)
-class AEdgelordCharacter : public ACharacter
+UCLASS()
+class EDGELORD_API AELCharacter : public ACharacter
+
 {
 	GENERATED_BODY()
 
@@ -52,7 +53,7 @@ protected:
 public:
 
 	/** Constructor */
-	AEdgelordCharacter();	
+	AELCharacter();	
 
 protected:
 
