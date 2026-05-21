@@ -52,6 +52,7 @@ AELCharacter::AELCharacter()
 
 void AELCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
+	
 	// Set up action bindings
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
 		
