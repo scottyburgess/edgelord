@@ -1,7 +1,5 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
-
 #pragma once
-
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "ELPlayerController.generated.h"
@@ -9,44 +7,33 @@
 class UInputMappingContext;
 class UUserWidget;
 
-/**
- *  Basic PlayerController class for a third person game
- *  Manages input mappings
- */
 UCLASS(abstract)
 class AELPlayerController : public APlayerController
 {
-	GENERATED_BODY()
-	
+    GENERATED_BODY()
+
+public:
+    // Call from lobby UI Ready button
+    UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Lobby")
+    void ServerSetReady();
+
 protected:
+    UPROPERTY(EditAnywhere, Category = "Input|Input Mappings")
+    TArray<UInputMappingContext*> DefaultMappingContexts;
 
-	/** Input Mapping Contexts */
-	UPROPERTY(EditAnywhere, Category ="Input|Input Mappings")
-	TArray<UInputMappingContext*> DefaultMappingContexts;
+    UPROPERTY(EditAnywhere, Category = "Input|Input Mappings")
+    TArray<UInputMappingContext*> MobileExcludedMappingContexts;
 
-	/** Input Mapping Contexts */
-	UPROPERTY(EditAnywhere, Category="Input|Input Mappings")
-	TArray<UInputMappingContext*> MobileExcludedMappingContexts;
+    UPROPERTY(EditAnywhere, Category = "Input|Touch Controls")
+    TSubclassOf<UUserWidget> MobileControlsWidgetClass;
 
-	/** Mobile controls widget to spawn */
-	UPROPERTY(EditAnywhere, Category="Input|Touch Controls")
-	TSubclassOf<UUserWidget> MobileControlsWidgetClass;
+    UPROPERTY()
+    TObjectPtr<UUserWidget> MobileControlsWidget;
 
-	/** Pointer to the mobile controls widget */
-	UPROPERTY()
-	TObjectPtr<UUserWidget> MobileControlsWidget;
+    UPROPERTY(EditAnywhere, Config, Category = "Input|Touch Controls")
+    bool bForceTouchControls = false;
 
-	/** If true, the player will use UMG touch controls even if not playing on mobile platforms */
-	UPROPERTY(EditAnywhere, Config, Category = "Input|Touch Controls")
-	bool bForceTouchControls = false;
-
-	/** Gameplay initialization */
-	virtual void BeginPlay() override;
-
-	/** Input mapping context setup */
-	virtual void SetupInputComponent() override;
-
-	/** Returns true if the player should use UMG touch controls */
-	bool ShouldUseTouchControls() const;
-
+    virtual void BeginPlay() override;
+    virtual void SetupInputComponent() override;
+    bool ShouldUseTouchControls() const;
 };
