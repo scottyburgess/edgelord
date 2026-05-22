@@ -20,3 +20,7 @@
 
 \- L\_GameLevel created
 
+
+
+\## Phase 2 in progress: PAC system structurally working (13/20 upper-body bodies simulating, profile system applies correctly). Mesh-detachment from capsule remains blocker. Tomorrow: research active ragdoll reference implementations or pivot to ragdoll-on-demand.
+

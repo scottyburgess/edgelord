@@ -1,7 +1,5 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
-
 #pragma once
-
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
@@ -10,88 +8,126 @@
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
+class UPhysicalAnimationComponent;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
-/**
- *  A simple player-controllable third person character
- *  Implements a controllable orbiting camera
- */
-UCLASS()
-class EDGELORD_API AELCharacter : public ACharacter
-
+UENUM(BlueprintType)
+enum class EELPhysicsProfile : uint8
 {
-	GENERATED_BODY()
-
-	/** Camera boom positioning the camera behind the character */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
-	USpringArmComponent* CameraBoom;
-
-	/** Follow camera */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
-	UCameraComponent* FollowCamera;
-	
-protected:
-
-	/** Jump Input Action */
-	UPROPERTY(EditAnywhere, Category="Input")
-	UInputAction* JumpAction;
-
-	/** Move Input Action */
-	UPROPERTY(EditAnywhere, Category="Input")
-	UInputAction* MoveAction;
-
-	/** Look Input Action */
-	UPROPERTY(EditAnywhere, Category="Input")
-	UInputAction* LookAction;
-
-	/** Mouse Look Input Action */
-	UPROPERTY(EditAnywhere, Category="Input")
-	UInputAction* MouseLookAction;
-
-public:
-
-	/** Constructor */
-	AELCharacter();	
-
-protected:
-
-	/** Initialize input action bindings */
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-
-protected:
-
-	/** Called for movement input */
-	void Move(const FInputActionValue& Value);
-
-	/** Called for looking input */
-	void Look(const FInputActionValue& Value);
-
-public:
-
-	/** Handles move inputs from either controls or UI interfaces */
-	UFUNCTION(BlueprintCallable, Category="Input")
-	virtual void DoMove(float Right, float Forward);
-
-	/** Handles look inputs from either controls or UI interfaces */
-	UFUNCTION(BlueprintCallable, Category="Input")
-	virtual void DoLook(float Yaw, float Pitch);
-
-	/** Handles jump pressed inputs from either controls or UI interfaces */
-	UFUNCTION(BlueprintCallable, Category="Input")
-	virtual void DoJumpStart();
-
-	/** Handles jump pressed inputs from either controls or UI interfaces */
-	UFUNCTION(BlueprintCallable, Category="Input")
-	virtual void DoJumpEnd();
-
-public:
-
-	/** Returns CameraBoom subobject **/
-	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
-
-	/** Returns FollowCamera subobject **/
-	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+    Standing    UMETA(DisplayName = "Standing"),
+    Walking     UMETA(DisplayName = "Walking"),
+    Grabbing    UMETA(DisplayName = "Grabbing"),
+    Ragdoll     UMETA(DisplayName = "Ragdoll"),
+    GettingUp   UMETA(DisplayName = "GettingUp")
 };
 
+USTRUCT(BlueprintType)
+struct FELPhysicsProfileSettings
+{
+    GENERATED_BODY()
+
+    // TODO: tune these values empirically — ship defaults, cap tuning at 1 week total
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics")
+    float OrientationStrength = 1000.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics")
+    float AngularVelocityStrength = 100.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics")
+    float PositionStrength = 0.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics")
+    float VelocityStrength = 0.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics")
+    float MaxLinearForce = 0.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics")
+    float MaxAngularForce = 0.f;
+};
+
+UCLASS()
+class EDGELORD_API AELCharacter : public ACharacter
+{
+    GENERATED_BODY()
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+    USpringArmComponent* CameraBoom;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+    UCameraComponent* FollowCamera;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+    UPhysicalAnimationComponent* PhysicalAnimation;
+
+public:
+    AELCharacter();
+
+    UPROPERTY(ReplicatedUsing = OnRep_PhysicsProfile, BlueprintReadOnly, Category = "Physics")
+    EELPhysicsProfile CurrentPhysicsProfile = EELPhysicsProfile::Standing;
+
+    UFUNCTION()
+    void OnRep_PhysicsProfile();
+
+    UFUNCTION(BlueprintCallable, Category = "Physics")
+    void SetPhysicsProfile(EELPhysicsProfile NewProfile);
+
+    virtual void GetLifetimeReplicatedProps(
+        TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+protected:
+    // TODO: tune these values — ship with defaults, cap tuning at 1 week total
+    UPROPERTY(EditAnywhere, Category = "Physics|Profiles")
+    FELPhysicsProfileSettings StandingProfile;
+
+    UPROPERTY(EditAnywhere, Category = "Physics|Profiles")
+    FELPhysicsProfileSettings WalkingProfile;
+
+    UPROPERTY(EditAnywhere, Category = "Physics|Profiles")
+    FELPhysicsProfileSettings GrabbingProfile;
+
+    UPROPERTY(EditAnywhere, Category = "Physics|Profiles")
+    FELPhysicsProfileSettings RagdollProfile;
+
+    UPROPERTY(EditAnywhere, Category = "Physics|Profiles")
+    FELPhysicsProfileSettings GettingUpProfile;
+
+    UPROPERTY(EditAnywhere, Category = "Input")
+    UInputAction* JumpAction;
+
+    UPROPERTY(EditAnywhere, Category = "Input")
+    UInputAction* MoveAction;
+
+    UPROPERTY(EditAnywhere, Category = "Input")
+    UInputAction* LookAction;
+
+    UPROPERTY(EditAnywhere, Category = "Input")
+    UInputAction* MouseLookAction;
+
+    virtual void BeginPlay() override;
+    virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+
+    void Move(const FInputActionValue& Value);
+    void Look(const FInputActionValue& Value);
+
+    void ApplyPhysicsProfile(const FELPhysicsProfileSettings& Settings);
+
+public:
+    UFUNCTION(BlueprintCallable, Category = "Input")
+    virtual void DoMove(float Right, float Forward);
+
+    UFUNCTION(BlueprintCallable, Category = "Input")
+    virtual void DoLook(float Yaw, float Pitch);
+
+    UFUNCTION(BlueprintCallable, Category = "Input")
+    virtual void DoJumpStart();
+
+    UFUNCTION(BlueprintCallable, Category = "Input")
+    virtual void DoJumpEnd();
+
+    FORCEINLINE USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
+    FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+    FORCEINLINE UPhysicalAnimationComponent* GetPhysicalAnimation() const { return PhysicalAnimation; }
+};
