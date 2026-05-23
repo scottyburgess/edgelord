@@ -42,14 +42,14 @@ AELCharacter::AELCharacter()
 
     PhysicalAnimation = CreateDefaultSubobject<UPhysicalAnimationComponent>(TEXT("PhysicalAnimation"));
 
-    // TODO: tune these values empirically — hard cap 1 week total tuning
+    // TODO: tune these values empirically - hard cap 1 week total tuning
 
-    StandingProfile.OrientationStrength = 10000.f;
-    StandingProfile.AngularVelocityStrength = 1000.f;
-    StandingProfile.PositionStrength = 0.f;
-    StandingProfile.VelocityStrength = 0.f;
-    StandingProfile.MaxLinearForce = 0.f;
-    StandingProfile.MaxAngularForce = 0.f;
+    StandingProfile.OrientationStrength = 1000.f;
+    StandingProfile.AngularVelocityStrength = 100.f;
+    StandingProfile.PositionStrength = 1000.f;
+    StandingProfile.VelocityStrength = 100.f;
+    StandingProfile.MaxLinearForce = 100.f;
+    StandingProfile.MaxAngularForce = 100.f;
 
     WalkingProfile.OrientationStrength = 500.f;
     WalkingProfile.AngularVelocityStrength = 50.f;
@@ -101,10 +101,10 @@ void AELCharacter::BeginPlay()
                     // Reset everything to kinematic first
                     GetMesh()->SetAllBodiesSimulatePhysics(false);
 
-                    // Only upper body simulates — legs stay animation-driven
-                    GetMesh()->SetAllBodiesBelowSimulatePhysics(FName("spine_03"), true, true);
-                    GetMesh()->SetBodySimulatePhysics(FName("pelvis"), false);
-                    GetMesh()->SetAllBodiesBelowPhysicsBlendWeight(FName("spine_03"), 1.0f);
+                    // Simulate everything below pelvis - pelvis stays kinematic as anchor
+                    // IncludeSelf=false is the critical change from the old spine_03 setup
+                    GetMesh()->SetAllBodiesBelowSimulatePhysics(FName("pelvis"), true, false);
+                    GetMesh()->SetAllBodiesBelowPhysicsBlendWeight(FName("pelvis"), 1.0f);
 
                     SetPhysicsProfile(EELPhysicsProfile::Standing);
 
@@ -168,8 +168,8 @@ void AELCharacter::ApplyPhysicsProfile(const FELPhysicsProfileSettings& Settings
     Data.MaxLinearForce = Settings.MaxLinearForce;
     Data.MaxAngularForce = Settings.MaxAngularForce;
 
-    // Apply to upper body only (matches our SetAllBodiesBelow setup)
-    PhysicalAnimation->ApplyPhysicalAnimationSettingsBelow(FName("spine_03"), Data, true);
+    // Apply below pelvis - full body simulation with pelvis as kinematic anchor
+    PhysicalAnimation->ApplyPhysicalAnimationSettingsBelow(FName("pelvis"), Data, true);
 }
 
 void AELCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
