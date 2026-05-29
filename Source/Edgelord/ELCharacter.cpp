@@ -14,6 +14,7 @@
 #include "UELGrabComponent.h"
 #include "UELCarryComponent.h"
 #include "Edgelord.h"
+#include "UELGetUpComponent.h"
 
 AELCharacter::AELCharacter()
 {
@@ -44,6 +45,7 @@ AELCharacter::AELCharacter()
     PhysicalAnimation = CreateDefaultSubobject<UPhysicalAnimationComponent>(TEXT("PhysicalAnimation"));
     GrabComponent = CreateDefaultSubobject<UELGrabComponent>(TEXT("GrabComponent"));
     CarryComponent = CreateDefaultSubobject<UELCarryComponent>(TEXT("CarryComponent"));
+    GetUpComponent = CreateDefaultSubobject<UELGetUpComponent>(TEXT("GetUpComponent"));
 
     // TODO: tune all profile values empirically - hard cap 1 week total
 
@@ -192,14 +194,15 @@ void AELCharacter::OnRep_CarriedBy()
     }
     else
     {
-        // Detach, restore physics state
         DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 
-        if (SkelMesh)
-            SkelMesh->SetBodySimulatePhysics(FName("pelvis"), false);
-        SetPhysicsProfile(EELPhysicsProfile::Standing);
+        SetPhysicsProfile(EELPhysicsProfile::Ragdoll);
         if (MoveComp)
-            MoveComp->SetMovementMode(MOVE_Walking);
+        {
+            // Falling mode lets gravity pull the capsule down to the ground.
+            // Get-up will switch back to Walking when it re-anchors.
+            MoveComp->SetMovementMode(MOVE_Falling);
+        }
     }
 }
 

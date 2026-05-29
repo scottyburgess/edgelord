@@ -12,7 +12,9 @@ class UInputAction;
 class UPhysicalAnimationComponent;
 class UELGrabComponent;
 class UELCarryComponent;
+class UELGetUpComponent;
 struct FInputActionValue;
+
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -69,6 +71,9 @@ class EDGELORD_API AELCharacter : public ACharacter, public IIELGrabbable
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
     UELCarryComponent* CarryComponent;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+    UELGetUpComponent* GetUpComponent;
 
 public:
     AELCharacter();
@@ -180,4 +185,5 @@ public:
     FORCEINLINE UPhysicalAnimationComponent* GetPhysicalAnimation() const { return PhysicalAnimation; }
     FORCEINLINE UELGrabComponent* GetGrabComponent() const { return GrabComponent; }
     FORCEINLINE UELCarryComponent* GetCarryComponent() const { return CarryComponent; }
+    FORCEINLINE UELGetUpComponent* GetGetUpComponent() const { return GetUpComponent; }
 };
