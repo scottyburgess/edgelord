@@ -2,6 +2,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
+#include "IELGrabbable.h"
 #include "UELGrabComponent.h"
 #include "ELCharacter.generated.h"
 
@@ -10,6 +11,7 @@ class UCameraComponent;
 class UInputAction;
 class UPhysicalAnimationComponent;
 class UELGrabComponent;
+class UELCarryComponent;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -49,7 +51,7 @@ struct FELPhysicsProfileSettings
 };
 
 UCLASS()
-class EDGELORD_API AELCharacter : public ACharacter
+class EDGELORD_API AELCharacter : public ACharacter, public IIELGrabbable
 {
     GENERATED_BODY()
 
@@ -64,6 +66,9 @@ class EDGELORD_API AELCharacter : public ACharacter
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
     UELGrabComponent* GrabComponent;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+    UELCarryComponent* CarryComponent;
 
 public:
     AELCharacter();
@@ -85,18 +90,34 @@ public:
     UFUNCTION()
     void OnRep_GrabState();
 
-    // Called by UELGrabComponent on owning client; RPC propagates to server
     UFUNCTION(BlueprintCallable, Category = "Grab")
     void SetGrabState(EELGrabState NewState);
 
     UFUNCTION(Server, Reliable)
     void ServerSetGrabState(EELGrabState NewState);
 
+    // --- Carry state ---
+    // Null = not carried. Non-null = the character carrying us.
+    UPROPERTY(ReplicatedUsing = OnRep_CarriedBy, BlueprintReadOnly, Category = "Carry")
+    AELCharacter* CarriedByCharacter = nullptr;
+
+    UFUNCTION()
+    void OnRep_CarriedBy();
+
+    UFUNCTION(Server, Reliable)
+    void ServerSetCarriedBy(AELCharacter* NewCarrier);
+
+    UFUNCTION(BlueprintCallable, Category = "Carry")
+    bool IsCarried() const { return CarriedByCharacter != nullptr; }
+
+    // --- IIELGrabbable ---
+    virtual UPrimitiveComponent* GetGrabbedComponent_Implementation() override;
+    virtual FName GetGrabbedBoneName_Implementation() override;
+
     virtual void GetLifetimeReplicatedProps(
         TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:
-    // TODO: tune physics profile values - hard cap 1 week total
     UPROPERTY(EditAnywhere, Category = "Physics|Profiles")
     FELPhysicsProfileSettings StandingProfile;
 
@@ -158,4 +179,5 @@ public:
     FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
     FORCEINLINE UPhysicalAnimationComponent* GetPhysicalAnimation() const { return PhysicalAnimation; }
     FORCEINLINE UELGrabComponent* GetGrabComponent() const { return GrabComponent; }
+    FORCEINLINE UELCarryComponent* GetCarryComponent() const { return CarryComponent; }
 };

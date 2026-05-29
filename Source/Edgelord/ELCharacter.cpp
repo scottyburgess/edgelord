@@ -2,6 +2,7 @@
 #include "Engine/LocalPlayer.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/Controller.h"
@@ -11,6 +12,7 @@
 #include "PhysicsEngine/PhysicalAnimationComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "UELGrabComponent.h"
+#include "UELCarryComponent.h"
 #include "Edgelord.h"
 
 AELCharacter::AELCharacter()
@@ -41,6 +43,7 @@ AELCharacter::AELCharacter()
 
     PhysicalAnimation = CreateDefaultSubobject<UPhysicalAnimationComponent>(TEXT("PhysicalAnimation"));
     GrabComponent = CreateDefaultSubobject<UELGrabComponent>(TEXT("GrabComponent"));
+    CarryComponent = CreateDefaultSubobject<UELCarryComponent>(TEXT("CarryComponent"));
 
     // TODO: tune all profile values empirically - hard cap 1 week total
 
@@ -111,8 +114,6 @@ void AELCharacter::BeginPlay()
                         Simulating, GetMesh()->Bodies.Num());
                 }
             }, 0.1f, false);
-
-        UE_LOG(LogTemp, Warning, TEXT("PAC setup deferred."));
     }
 }
 
@@ -122,6 +123,7 @@ void AELCharacter::GetLifetimeReplicatedProps(
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(AELCharacter, CurrentPhysicsProfile);
     DOREPLIFETIME(AELCharacter, CurrentGrabState);
+    DOREPLIFETIME(AELCharacter, CarriedByCharacter);
 }
 
 void AELCharacter::OnRep_PhysicsProfile()
@@ -160,11 +162,61 @@ void AELCharacter::SetGrabState(EELGrabState NewState)
         ServerSetGrabState(NewState);
     else
         CurrentGrabState = NewState;
+
+    // Notify carry component locally so it can react to grab changes
+    if (CarryComponent)
+        CarryComponent->OnGrabStateChanged();
 }
 
 void AELCharacter::ServerSetGrabState_Implementation(EELGrabState NewState)
 {
     CurrentGrabState = NewState;
+}
+
+void AELCharacter::OnRep_CarriedBy()
+{
+    UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+    USkeletalMeshComponent* SkelMesh = GetMesh();
+
+    if (CarriedByCharacter)
+    {
+        // Go limp: full ragdoll, pelvis simulates so the constraint can drag us
+        SetPhysicsProfile(EELPhysicsProfile::Ragdoll);
+        if (SkelMesh)
+            SkelMesh->SetBodySimulatePhysics(FName("pelvis"), true);
+        if (MoveComp)
+            MoveComp->DisableMovement();
+
+        // Attach our whole actor to the carrier so the capsule actually follows them
+        AttachToActor(CarriedByCharacter, FAttachmentTransformRules::KeepWorldTransform);
+    }
+    else
+    {
+        // Detach, restore physics state
+        DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+
+        if (SkelMesh)
+            SkelMesh->SetBodySimulatePhysics(FName("pelvis"), false);
+        SetPhysicsProfile(EELPhysicsProfile::Standing);
+        if (MoveComp)
+            MoveComp->SetMovementMode(MOVE_Walking);
+    }
+}
+
+void AELCharacter::ServerSetCarriedBy_Implementation(AELCharacter* NewCarrier)
+{
+    CarriedByCharacter = NewCarrier;
+    OnRep_CarriedBy(); // run effects on server too
+}
+
+UPrimitiveComponent* AELCharacter::GetGrabbedComponent_Implementation()
+{
+    return GetMesh();
+}
+
+FName AELCharacter::GetGrabbedBoneName_Implementation()
+{
+    return NAME_None;  // let GrabComponent pick the nearest simulated body
 }
 
 void AELCharacter::ApplyPhysicsProfile(const FELPhysicsProfileSettings& Settings)
@@ -223,8 +275,27 @@ void AELCharacter::Look(const FInputActionValue& Value)
     DoLook(LookAxisVector.X, LookAxisVector.Y);
 }
 
+void AELCharacter::Input_GrabLeft_Started(const FInputActionValue& Value)
+{
+    GrabComponent->TryGrab(EELHandSide::Left);
+}
+void AELCharacter::Input_GrabLeft_Completed(const FInputActionValue& Value)
+{
+    GrabComponent->ReleaseGrab(EELHandSide::Left);
+}
+void AELCharacter::Input_GrabRight_Started(const FInputActionValue& Value)
+{
+    GrabComponent->TryGrab(EELHandSide::Right);
+}
+void AELCharacter::Input_GrabRight_Completed(const FInputActionValue& Value)
+{
+    GrabComponent->ReleaseGrab(EELHandSide::Right);
+}
+
 void AELCharacter::DoMove(float Right, float Forward)
 {
+    if (CarriedByCharacter) return;  // carry disables locomotion input
+
     if (GetController() != nullptr)
     {
         const FRotator Rotation = GetController()->GetControlRotation();
@@ -245,22 +316,5 @@ void AELCharacter::DoLook(float Yaw, float Pitch)
     }
 }
 
-void AELCharacter::DoJumpStart() { Jump(); }
+void AELCharacter::DoJumpStart() { if (!CarriedByCharacter) Jump(); }
 void AELCharacter::DoJumpEnd() { StopJumping(); }
-
-void AELCharacter::Input_GrabLeft_Started(const FInputActionValue& Value)
-{
-    GrabComponent->TryGrab(EELHandSide::Left);
-}
-void AELCharacter::Input_GrabLeft_Completed(const FInputActionValue& Value)
-{
-    GrabComponent->ReleaseGrab(EELHandSide::Left);
-}
-void AELCharacter::Input_GrabRight_Started(const FInputActionValue& Value)
-{
-    GrabComponent->TryGrab(EELHandSide::Right);
-}
-void AELCharacter::Input_GrabRight_Completed(const FInputActionValue& Value)
-{
-    GrabComponent->ReleaseGrab(EELHandSide::Right);
-}

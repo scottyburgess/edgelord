@@ -28,11 +28,9 @@ class EDGELORD_API UELGrabComponent : public UActorComponent
 public:
     UELGrabComponent();
 
-    // Sphere radius for grab detection in cm. Tune in BP_ELCharacter.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grab")
-    float GrabRadius = 30.f;
-
-    // TODO: tune grab radius per play-test — 30cm is a starting guess
+    float GrabRadius = 50.f;
+    // TODO: tune grab radius per play-test
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grab")
     FName LeftHandBone = FName("hand_l");
@@ -44,6 +42,9 @@ public:
     void ReleaseGrab(EELHandSide Hand);
     bool IsGrabbing(EELHandSide Hand) const;
     EELGrabState GetGrabState() const;
+
+    UFUNCTION(BlueprintCallable, Category = "Grab")
+    AActor* GetGrabbedActor(EELHandSide Hand) const;
 
 protected:
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;

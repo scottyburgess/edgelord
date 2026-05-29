@@ -2,6 +2,7 @@
 #include "IELGrabbable.h"
 #include "ELCharacter.h"
 #include "Engine/OverlapResult.h"
+#include "Components/SkeletalMeshComponent.h"
 
 UELGrabComponent::UELGrabComponent()
 {
@@ -51,6 +52,14 @@ EELGrabState UELGrabComponent::GetGrabState() const
     return EELGrabState::None;
 }
 
+AActor* UELGrabComponent::GetGrabbedActor(EELHandSide Hand) const
+{
+    UPrimitiveComponent* Comp = (Hand == EELHandSide::Left)
+        ? LeftGrabbedComponent.Get()
+        : RightGrabbedComponent.Get();
+    return Comp ? Comp->GetOwner() : nullptr;
+}
+
 void UELGrabComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     ExecuteRelease(LeftConstraint, LeftGrabbedComponent);
@@ -95,7 +104,38 @@ void UELGrabComponent::ExecuteGrab(FName BoneName, FConstraintInstance*& OutCons
         UPrimitiveComponent* GrabComp = IIELGrabbable::Execute_GetGrabbedComponent(HitActor);
         if (!GrabComp) continue;
 
-        FBodyInstance* TargetBody = GrabComp->GetBodyInstance();
+        // Resolve target body
+        FBodyInstance* TargetBody = nullptr;
+        FName TargetBone = IIELGrabbable::Execute_GetGrabbedBoneName(HitActor);
+
+        if (USkeletalMeshComponent* SkelMesh = Cast<USkeletalMeshComponent>(GrabComp))
+        {
+            // If the interface didn't pick a bone, find the nearest simulated body to the hand
+            if (TargetBone == NAME_None)
+            {
+                float BestDistSq = TNumericLimits<float>::Max();
+                for (FBodyInstance* Body : SkelMesh->Bodies)
+                {
+                    if (!Body || !Body->bSimulatePhysics) continue;
+                    const float DistSq = FVector::DistSquared(
+                        Body->GetUnrealWorldTransform().GetLocation(), HandLocation);
+                    if (DistSq < BestDistSq)
+                    {
+                        BestDistSq = DistSq;
+                        TargetBody = Body;
+                        const int32 BodyIndex = SkelMesh->Bodies.IndexOfByKey(Body);
+                        TargetBone = SkelMesh->GetBoneName(BodyIndex);
+                    }
+                }
+            }
+            else
+            {
+                TargetBody = SkelMesh->GetBodyInstance(TargetBone);
+            }
+        }
+
+        if (!TargetBody)
+            TargetBody = GrabComp->GetBodyInstance();
         if (!TargetBody) continue;
 
         FConstraintInstance* CI = new FConstraintInstance();
@@ -111,8 +151,10 @@ void UELGrabComponent::ExecuteGrab(FName BoneName, FConstraintInstance*& OutCons
         OutConstraint = CI;
         OutGrabbedComp = GrabComp;
 
-        UE_LOG(LogTemp, Log, TEXT("UELGrabComponent: Grabbed %s on bone %s"),
-            *HitActor->GetName(), *BoneName.ToString());
+        UE_LOG(LogTemp, Log, TEXT("UELGrabComponent: Grabbed %s (bone %s) on hand bone %s"),
+            *HitActor->GetName(),
+            TargetBone == NAME_None ? TEXT("root") : *TargetBone.ToString(),
+            *BoneName.ToString());
         return;
     }
 }

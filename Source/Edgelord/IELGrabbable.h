@@ -14,9 +14,13 @@ class EDGELORD_API IIELGrabbable
     GENERATED_BODY()
 
 public:
-    // Return the component the grab constraint should attach to.
-    // For static objects: the static mesh component.
-    // For characters: the root physics body's component.
+    // The component the grab constraint should attach to.
     UFUNCTION(BlueprintNativeEvent, Category = "Grab")
     UPrimitiveComponent* GetGrabbedComponent();
+    virtual UPrimitiveComponent* GetGrabbedComponent_Implementation() { return nullptr; }
+
+    // Optional — specific bone for skeletal meshes. Return NAME_None to use the component root body.
+    UFUNCTION(BlueprintNativeEvent, Category = "Grab")
+    FName GetGrabbedBoneName();
+    virtual FName GetGrabbedBoneName_Implementation() { return NAME_None; }
 };
