@@ -1,5 +1,3 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
-
 #include "ELCharacter.h"
 #include "Engine/LocalPlayer.h"
 #include "Camera/CameraComponent.h"
@@ -12,6 +10,7 @@
 #include "InputActionValue.h"
 #include "PhysicsEngine/PhysicalAnimationComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "UELGrabComponent.h"
 #include "Edgelord.h"
 
 AELCharacter::AELCharacter()
@@ -41,8 +40,9 @@ AELCharacter::AELCharacter()
     FollowCamera->bUsePawnControlRotation = false;
 
     PhysicalAnimation = CreateDefaultSubobject<UPhysicalAnimationComponent>(TEXT("PhysicalAnimation"));
+    GrabComponent = CreateDefaultSubobject<UELGrabComponent>(TEXT("GrabComponent"));
 
-    // TODO: tune these values empirically - hard cap 1 week total tuning
+    // TODO: tune all profile values empirically - hard cap 1 week total
 
     StandingProfile.OrientationStrength = 1000.f;
     StandingProfile.AngularVelocityStrength = 100.f;
@@ -92,20 +92,14 @@ void AELCharacter::BeginPlay()
     {
         PhysicalAnimation->SetSkeletalMeshComponent(GetMesh());
 
-        // Defer physics setup by one frame to ensure mesh is fully initialized
         FTimerHandle TimerHandle;
         GetWorld()->GetTimerManager().SetTimer(TimerHandle, [this]()
             {
                 if (GetMesh())
                 {
-                    // Reset everything to kinematic first
                     GetMesh()->SetAllBodiesSimulatePhysics(false);
-
-                    // Simulate everything below pelvis - pelvis stays kinematic as anchor
-                    // IncludeSelf=false is the critical change from the old spine_03 setup
                     GetMesh()->SetAllBodiesBelowSimulatePhysics(FName("pelvis"), true, false);
                     GetMesh()->SetAllBodiesBelowPhysicsBlendWeight(FName("pelvis"), 1.0f);
-
                     SetPhysicsProfile(EELPhysicsProfile::Standing);
 
                     int32 Simulating = 0;
@@ -127,6 +121,7 @@ void AELCharacter::GetLifetimeReplicatedProps(
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(AELCharacter, CurrentPhysicsProfile);
+    DOREPLIFETIME(AELCharacter, CurrentGrabState);
 }
 
 void AELCharacter::OnRep_PhysicsProfile()
@@ -144,7 +139,6 @@ void AELCharacter::OnRep_PhysicsProfile()
 void AELCharacter::SetPhysicsProfile(EELPhysicsProfile NewProfile)
 {
     CurrentPhysicsProfile = NewProfile;
-
     switch (NewProfile)
     {
     case EELPhysicsProfile::Standing:   ApplyPhysicsProfile(StandingProfile);  break;
@@ -153,6 +147,24 @@ void AELCharacter::SetPhysicsProfile(EELPhysicsProfile NewProfile)
     case EELPhysicsProfile::Ragdoll:    ApplyPhysicsProfile(RagdollProfile);   break;
     case EELPhysicsProfile::GettingUp:  ApplyPhysicsProfile(GettingUpProfile); break;
     }
+}
+
+void AELCharacter::OnRep_GrabState()
+{
+    // TODO: drive grab animation state from CurrentGrabState when AnimBP supports it
+}
+
+void AELCharacter::SetGrabState(EELGrabState NewState)
+{
+    if (!HasAuthority())
+        ServerSetGrabState(NewState);
+    else
+        CurrentGrabState = NewState;
+}
+
+void AELCharacter::ServerSetGrabState_Implementation(EELGrabState NewState)
+{
+    CurrentGrabState = NewState;
 }
 
 void AELCharacter::ApplyPhysicsProfile(const FELPhysicsProfileSettings& Settings)
@@ -168,24 +180,34 @@ void AELCharacter::ApplyPhysicsProfile(const FELPhysicsProfileSettings& Settings
     Data.MaxLinearForce = Settings.MaxLinearForce;
     Data.MaxAngularForce = Settings.MaxAngularForce;
 
-    // Apply below pelvis - full body simulation with pelvis as kinematic anchor
     PhysicalAnimation->ApplyPhysicalAnimationSettingsBelow(FName("pelvis"), Data, true);
 }
 
 void AELCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
-    if (UEnhancedInputComponent* EnhancedInputComponent =
-        Cast<UEnhancedInputComponent>(PlayerInputComponent))
+    if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent))
     {
-        EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
-        EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
-        EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AELCharacter::Move);
-        EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AELCharacter::Look);
-        EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AELCharacter::Look);
+        EIC->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
+        EIC->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
+        EIC->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AELCharacter::Move);
+        EIC->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AELCharacter::Look);
+        EIC->BindAction(LookAction, ETriggerEvent::Triggered, this, &AELCharacter::Look);
+
+        if (GrabLeftAction)
+        {
+            EIC->BindAction(GrabLeftAction, ETriggerEvent::Started, this, &AELCharacter::Input_GrabLeft_Started);
+            EIC->BindAction(GrabLeftAction, ETriggerEvent::Completed, this, &AELCharacter::Input_GrabLeft_Completed);
+        }
+        if (GrabRightAction)
+        {
+            EIC->BindAction(GrabRightAction, ETriggerEvent::Started, this, &AELCharacter::Input_GrabRight_Started);
+            EIC->BindAction(GrabRightAction, ETriggerEvent::Completed, this, &AELCharacter::Input_GrabRight_Completed);
+        }
     }
     else
     {
-        UE_LOG(LogEdgelord, Error, TEXT("'%s' Failed to find an Enhanced Input component!"), *GetNameSafe(this));
+        UE_LOG(LogEdgelord, Error, TEXT("'%s' Failed to find an Enhanced Input component!"),
+            *GetNameSafe(this));
     }
 }
 
@@ -223,12 +245,22 @@ void AELCharacter::DoLook(float Yaw, float Pitch)
     }
 }
 
-void AELCharacter::DoJumpStart()
-{
-    Jump();
-}
+void AELCharacter::DoJumpStart() { Jump(); }
+void AELCharacter::DoJumpEnd() { StopJumping(); }
 
-void AELCharacter::DoJumpEnd()
+void AELCharacter::Input_GrabLeft_Started(const FInputActionValue& Value)
 {
-    StopJumping();
+    GrabComponent->TryGrab(EELHandSide::Left);
+}
+void AELCharacter::Input_GrabLeft_Completed(const FInputActionValue& Value)
+{
+    GrabComponent->ReleaseGrab(EELHandSide::Left);
+}
+void AELCharacter::Input_GrabRight_Started(const FInputActionValue& Value)
+{
+    GrabComponent->TryGrab(EELHandSide::Right);
+}
+void AELCharacter::Input_GrabRight_Completed(const FInputActionValue& Value)
+{
+    GrabComponent->ReleaseGrab(EELHandSide::Right);
 }

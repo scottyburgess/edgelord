@@ -1,14 +1,15 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
 #pragma once
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
+#include "UELGrabComponent.h"
 #include "ELCharacter.generated.h"
 
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
 class UPhysicalAnimationComponent;
+class UELGrabComponent;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -28,7 +29,6 @@ struct FELPhysicsProfileSettings
 {
     GENERATED_BODY()
 
-    // TODO: tune these values empirically — ship defaults, cap tuning at 1 week total
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics")
     float OrientationStrength = 1000.f;
 
@@ -62,9 +62,13 @@ class EDGELORD_API AELCharacter : public ACharacter
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
     UPhysicalAnimationComponent* PhysicalAnimation;
 
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+    UELGrabComponent* GrabComponent;
+
 public:
     AELCharacter();
 
+    // --- Physics profile ---
     UPROPERTY(ReplicatedUsing = OnRep_PhysicsProfile, BlueprintReadOnly, Category = "Physics")
     EELPhysicsProfile CurrentPhysicsProfile = EELPhysicsProfile::Standing;
 
@@ -74,11 +78,25 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Physics")
     void SetPhysicsProfile(EELPhysicsProfile NewProfile);
 
+    // --- Grab state (replicated for cosmetics; physics is local) ---
+    UPROPERTY(ReplicatedUsing = OnRep_GrabState, BlueprintReadOnly, Category = "Grab")
+    EELGrabState CurrentGrabState = EELGrabState::None;
+
+    UFUNCTION()
+    void OnRep_GrabState();
+
+    // Called by UELGrabComponent on owning client; RPC propagates to server
+    UFUNCTION(BlueprintCallable, Category = "Grab")
+    void SetGrabState(EELGrabState NewState);
+
+    UFUNCTION(Server, Reliable)
+    void ServerSetGrabState(EELGrabState NewState);
+
     virtual void GetLifetimeReplicatedProps(
         TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:
-    // TODO: tune these values — ship with defaults, cap tuning at 1 week total
+    // TODO: tune physics profile values - hard cap 1 week total
     UPROPERTY(EditAnywhere, Category = "Physics|Profiles")
     FELPhysicsProfileSettings StandingProfile;
 
@@ -106,12 +124,21 @@ protected:
     UPROPERTY(EditAnywhere, Category = "Input")
     UInputAction* MouseLookAction;
 
+    UPROPERTY(EditAnywhere, Category = "Input")
+    UInputAction* GrabLeftAction;
+
+    UPROPERTY(EditAnywhere, Category = "Input")
+    UInputAction* GrabRightAction;
+
     virtual void BeginPlay() override;
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
     void Move(const FInputActionValue& Value);
     void Look(const FInputActionValue& Value);
-
+    void Input_GrabLeft_Started(const FInputActionValue& Value);
+    void Input_GrabLeft_Completed(const FInputActionValue& Value);
+    void Input_GrabRight_Started(const FInputActionValue& Value);
+    void Input_GrabRight_Completed(const FInputActionValue& Value);
     void ApplyPhysicsProfile(const FELPhysicsProfileSettings& Settings);
 
 public:
@@ -130,4 +157,5 @@ public:
     FORCEINLINE USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
     FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
     FORCEINLINE UPhysicalAnimationComponent* GetPhysicalAnimation() const { return PhysicalAnimation; }
+    FORCEINLINE UELGrabComponent* GetGrabComponent() const { return GrabComponent; }
 };
