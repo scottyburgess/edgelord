@@ -125,6 +125,7 @@ void AELCharacter::GetLifetimeReplicatedProps(
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(AELCharacter, CurrentPhysicsProfile);
     DOREPLIFETIME(AELCharacter, CurrentGrabState);
+    DOREPLIFETIME(AELCharacter, CurrentCarryState);
     DOREPLIFETIME(AELCharacter, CarriedByCharacter);
 }
 
@@ -175,41 +176,53 @@ void AELCharacter::ServerSetGrabState_Implementation(EELGrabState NewState)
     CurrentGrabState = NewState;
 }
 
-void AELCharacter::OnRep_CarriedBy()
+void AELCharacter::OnRep_CarryState()
 {
     UCharacterMovementComponent* MoveComp = GetCharacterMovement();
     USkeletalMeshComponent* SkelMesh = GetMesh();
 
-    if (CarriedByCharacter)
+    switch (CurrentCarryState)
     {
-        // Go limp: full ragdoll, pelvis simulates so the constraint can drag us
-        SetPhysicsProfile(EELPhysicsProfile::Ragdoll);
-        if (SkelMesh)
-            SkelMesh->SetBodySimulatePhysics(FName("pelvis"), true);
-        if (MoveComp)
-            MoveComp->DisableMovement();
+    case EELCarryState::Stable:
+        // Grabbed but on feet — retain input, normal physics
+        if (SkelMesh) SkelMesh->SetBodySimulatePhysics(FName("pelvis"), false);
+        SetPhysicsProfile(EELPhysicsProfile::Standing);
+        if (MoveComp) MoveComp->SetMovementMode(MOVE_Walking);
+        break;
 
-        // Attach our whole actor to the carrier so the capsule actually follows them
-        AttachToActor(CarriedByCharacter, FAttachmentTransformRules::KeepWorldTransform);
-    }
-    else
-    {
-        DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-
+    case EELCarryState::Dragged:
+        // Lost footing — ragdoll, no input, gravity pulls capsule down naturally
         SetPhysicsProfile(EELPhysicsProfile::Ragdoll);
-        if (MoveComp)
-        {
-            // Falling mode lets gravity pull the capsule down to the ground.
-            // Get-up will switch back to Walking when it re-anchors.
-            MoveComp->SetMovementMode(MOVE_Falling);
-        }
+        if (SkelMesh) SkelMesh->SetBodySimulatePhysics(FName("pelvis"), true);
+        if (MoveComp) MoveComp->SetMovementMode(MOVE_Falling);
+        break;
+
+    case EELCarryState::None:
+        // Released — ragdoll until get-up recovers
+        SetPhysicsProfile(EELPhysicsProfile::Ragdoll);
+        if (MoveComp) MoveComp->SetMovementMode(MOVE_Falling);
+        break;
     }
+
+    OnRep_CarriedBy(); // re-evaluate attachment based on the new state
 }
 
-void AELCharacter::ServerSetCarriedBy_Implementation(AELCharacter* NewCarrier)
+void AELCharacter::OnRep_CarriedBy()
 {
+    // Only attach in Dragged state. In Stable, the grab constraint does the pulling
+    // so the grabbee's feet plant naturally and they get tugged behind the carrier.
+    DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+
+    if (CarriedByCharacter && CurrentCarryState == EELCarryState::Dragged)
+        AttachToActor(CarriedByCharacter, FAttachmentTransformRules::KeepWorldTransform);
+}
+
+void AELCharacter::ServerSetCarryState_Implementation(EELCarryState NewState, AELCharacter* NewCarrier)
+{
+    CurrentCarryState = NewState;
     CarriedByCharacter = NewCarrier;
-    OnRep_CarriedBy(); // run effects on server too
+    OnRep_CarryState();
+    OnRep_CarriedBy();
 }
 
 UPrimitiveComponent* AELCharacter::GetGrabbedComponent_Implementation()
@@ -297,7 +310,7 @@ void AELCharacter::Input_GrabRight_Completed(const FInputActionValue& Value)
 
 void AELCharacter::DoMove(float Right, float Forward)
 {
-    if (CarriedByCharacter) return;  // carry disables locomotion input
+    if (CurrentCarryState == EELCarryState::Dragged) return;  // carry disables locomotion input
 
     if (GetController() != nullptr)
     {
@@ -319,5 +332,5 @@ void AELCharacter::DoLook(float Yaw, float Pitch)
     }
 }
 
-void AELCharacter::DoJumpStart() { if (!CarriedByCharacter) Jump(); }
+void AELCharacter::DoJumpStart() { if (CurrentCarryState != EELCarryState::Dragged) Jump(); }
 void AELCharacter::DoJumpEnd() { StopJumping(); }

@@ -139,13 +139,24 @@ void UELGrabComponent::ExecuteGrab(FName BoneName, FConstraintInstance*& OutCons
         if (!TargetBody) continue;
 
         FConstraintInstance* CI = new FConstraintInstance();
-        CI->SetLinearXMotion(ELinearConstraintMotion::LCM_Locked);
-        CI->SetLinearYMotion(ELinearConstraintMotion::LCM_Locked);
-        CI->SetLinearZMotion(ELinearConstraintMotion::LCM_Locked);
-        // TODO: tune — consider limited angular motion for more control
+
+        // Limited linear motion with some slack — lets the arm stretch instead of fighting
+        // the PAC angular drives that hold the rest pose.
+        CI->SetLinearXMotion(ELinearConstraintMotion::LCM_Limited);
+        CI->SetLinearYMotion(ELinearConstraintMotion::LCM_Limited);
+        CI->SetLinearZMotion(ELinearConstraintMotion::LCM_Limited);
+        CI->SetLinearLimitSize(20.f);  // 20cm of slack in the grab
+
+        // Soft linear limit so it stretches like an elastic tether rather than a hard wall
+        CI->ProfileInstance.LinearLimit.bSoftConstraint = true;
+        CI->ProfileInstance.LinearLimit.Stiffness = 500.f;
+        CI->ProfileInstance.LinearLimit.Damping = 50.f;
+
+        // Free rotation — Gang Beasts style, object can spin in hand
         CI->SetAngularSwing1Motion(EAngularConstraintMotion::ACM_Free);
         CI->SetAngularSwing2Motion(EAngularConstraintMotion::ACM_Free);
         CI->SetAngularTwistMotion(EAngularConstraintMotion::ACM_Free);
+
         CI->InitConstraint(HandBody, TargetBody, 1.0f, this);
 
         OutConstraint = CI;

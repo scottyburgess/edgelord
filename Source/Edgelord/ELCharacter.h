@@ -4,6 +4,7 @@
 #include "Logging/LogMacros.h"
 #include "IELGrabbable.h"
 #include "UELGrabComponent.h"
+#include "UELCarryComponent.h"
 #include "ELCharacter.generated.h"
 
 class USpringArmComponent;
@@ -101,19 +102,30 @@ public:
     UFUNCTION(Server, Reliable)
     void ServerSetGrabState(EELGrabState NewState);
 
+    UFUNCTION(BlueprintCallable, Category = "Carry")
+    AELCharacter* GetCarrier() const { return CarriedByCharacter; }
+
     // --- Carry state ---
-    // Null = not carried. Non-null = the character carrying us.
+    UPROPERTY(ReplicatedUsing = OnRep_CarryState, BlueprintReadOnly, Category = "Carry")
+    EELCarryState CurrentCarryState = EELCarryState::None;
+
     UPROPERTY(ReplicatedUsing = OnRep_CarriedBy, BlueprintReadOnly, Category = "Carry")
     AELCharacter* CarriedByCharacter = nullptr;
+
+    UFUNCTION()
+    void OnRep_CarryState();
 
     UFUNCTION()
     void OnRep_CarriedBy();
 
     UFUNCTION(Server, Reliable)
-    void ServerSetCarriedBy(AELCharacter* NewCarrier);
+    void ServerSetCarryState(EELCarryState NewState, AELCharacter* NewCarrier);
 
     UFUNCTION(BlueprintCallable, Category = "Carry")
-    bool IsCarried() const { return CarriedByCharacter != nullptr; }
+    bool IsCarried() const { return CurrentCarryState != EELCarryState::None; }
+
+    UFUNCTION(BlueprintCallable, Category = "Carry")
+    bool IsDragged() const { return CurrentCarryState == EELCarryState::Dragged; }
 
     // --- IIELGrabbable ---
     virtual UPrimitiveComponent* GetGrabbedComponent_Implementation() override;

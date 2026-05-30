@@ -76,19 +76,32 @@ void UELGetUpComponent::StartGetUp()
 void UELGetUpComponent::FinishGetUp()
 {
     AELCharacter* Owner = Cast<AELCharacter>(GetOwner());
-    if (!Owner) { bGettingUp = false; return; }
+    if (!Owner)
+    {
+        bGettingUp = false;
+        return;
+    }
 
-    // Re-anchor pelvis as the kinematic root so the mesh snaps upright with the capsule
     if (USkeletalMeshComponent* Mesh = Owner->GetMesh())
         Mesh->SetBodySimulatePhysics(PelvisBoneName, false);
 
-    // Restore walking mode now that we're re-anchored
     if (UCharacterMovementComponent* MoveComp = Owner->GetCharacterMovement())
         MoveComp->SetMovementMode(MOVE_Walking);
 
-        Owner->SetPhysicsProfile(EELPhysicsProfile::Standing);
+    Owner->SetPhysicsProfile(EELPhysicsProfile::Standing);
 
-    // Stay in "getting up" state for cooldown duration so we don't immediately re-trigger
+    // If we recovered while still tethered to a carrier, tell their carry component
+    // so they flip us back to Stable rather than leaving us in a half-dragged limbo.
+    if (Owner->IsDragged())
+    {
+        if (AELCharacter* Carrier = Owner->GetCarrier())
+        {
+            if (UELCarryComponent* CarrierCarry = Carrier->GetCarryComponent())
+                CarrierCarry->OnGrabbeeRecovered(Owner);
+        }
+    }
+
+    // Cooldown before we can detect again
     GetWorld()->GetTimerManager().SetTimer(GetUpTimerHandle,
         [this]() { bGettingUp = false; },
         PostGetUpCooldown, false);
